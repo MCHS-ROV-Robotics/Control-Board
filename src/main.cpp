@@ -1,11 +1,15 @@
 #include <Arduino.h>
 #include <Servo.h>
+#include <SoftwareSerial.h>
+
 
 //Motor Pins
 byte RightMotorID = 9;
 byte LeftMotorID = 10;
 byte BallastLeftID = 11;
 byte BallastRightID = 12;
+
+SoftwareSerial HC12(16, 17); // HC-12 TX Pin, HC-12 RX Pin
 
 //Controller Pins (Y=Up/Down, X=Left/Right)
 byte LXID = A1; // Left X
@@ -19,8 +23,11 @@ Servo LeftMotor;
 Servo BallastLeft;
 Servo BallastRight;
 
+
 void setup() {
   Serial.begin(9600);
+  HC12.begin(9600);               // Serial port to HC12
+  
   // put your setup code here, to run once:
   RightMotor.attach(RightMotorID);
   LeftMotor.attach(LeftMotorID);
@@ -36,14 +43,35 @@ void setup() {
   
 }
 
-void loop() {
-int RightX = analogRead(A0);
-int RightY = analogRead(A1);
-int LeftX = analogRead(A2);
-int LeftY = analogRead(A3);
-  // put your main code here, to run repeatedly:
-  Serial.println("RX:"+String(RightX)+"\n"+"RY:" + String(RightY) + "\n"+"LX:" + String(LeftX) + "\n"+"LY:" + String(LeftY));
-servo.writeMicroseconds(val);
-  delay(1);
+// Helper function to extract value from data string
+int extractValue(String data, String key) {
+  int startIndex = data.indexOf(key + ":") + key.length() + 1;
+  int endIndex = data.indexOf(",", startIndex);
+  if (endIndex == -1) endIndex = data.length();
+  return data.substring(startIndex, endIndex).toInt();
 }
 
+void loop() {
+  String data = "";
+  while (HC12.available()) {
+    Serial.write(HC12.read());
+    data = HC12.readString();
+  }
+
+  if (data.length() > 0) {
+    // Parse the received data
+    int RightX = extractValue(data, "RX");
+    int RightY = extractValue(data, "RY");
+    int LeftX = extractValue(data, "LX");
+    int LeftY = extractValue(data, "LY");
+
+    // Control motors with parsed values
+    RightMotor.writeMicroseconds(LeftX-LeftY);
+    LeftMotor.writeMicroseconds(LeftY);
+    // You can add control for other motors here
+    
+    Serial.println("Parsed - RX:" + String(RightX) + ",RY:" + String(RightY) + 
+                  ",LX:" + String(LeftX) + ",LY:" + String(LeftY));
+  }
+  delay(1);
+}
