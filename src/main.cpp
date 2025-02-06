@@ -45,10 +45,20 @@ void setup() {
 
 // Helper function to extract value from data string
 int extractValue(String data, String key) {
-  int startIndex = data.indexOf(key + ":") + key.length() + 1;
+  int startIndex = data.indexOf(key) + key.length() + 1;
   int endIndex = data.indexOf(",", startIndex);
   if (endIndex == -1) endIndex = data.length();
   return data.substring(startIndex, endIndex).toInt();
+}
+
+// Scale two values to fit between -1 and 1 while maintaining their ratio
+void scaleValues(double &val1, double &val2) {
+    double maxAbs = max(abs(val1), abs(val2));
+    if (maxAbs > 1.0 || maxAbs < -1.0) {
+        double scale = 1.0 / maxAbs;
+        val1 *= scale;
+        val2 *= scale;
+    }
 }
 
 void loop() {
@@ -60,18 +70,15 @@ void loop() {
 
   if (data.length() > 0) {
     // Parse the received data
-    int RightX = extractValue(data, "RX");
-    int RightY = extractValue(data, "RY");
-    int LeftX = extractValue(data, "LX");
-    int LeftY = extractValue(data, "LY");
+    double FORWARD = extractValue(data, "F");
+    double TURN = extractValue(data, "T");
 
-    // Control motors with parsed values
-    RightMotor.writeMicroseconds(LeftX-LeftY);
-    LeftMotor.writeMicroseconds(LeftY);
-    // You can add control for other motors here
-    
-    Serial.println("Parsed - RX:" + String(RightX) + ",RY:" + String(RightY) + 
-                  ",LX:" + String(LeftX) + ",LY:" + String(LeftY));
+    // Scale the values while maintaining their ratio
+    scaleValues(FORWARD, TURN);
+
+    // Control motors with scaled values
+    RightMotor.write((FORWARD - TURN));  // Convert -1 to 1 range to 0-180 range
+    LeftMotor.write((FORWARD + TURN));
   }
   delay(1);
 }
